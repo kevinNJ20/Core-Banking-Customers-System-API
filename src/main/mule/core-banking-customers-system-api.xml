@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:db="http://www.mulesoft.org/schema/mule/db"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+  http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+  <!-- GET /customers - Business Logic Flow -->
+  <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
+    <try doc:name="Try">
+      <db:select doc:name="Select Customers" config-ref="Database_Config">
+        <db:sql><![CDATA[SELECT 
+  id, customer_number, party_type, first_name, last_name, middle_name, 
+  organization_name, date_of_birth, tax_id, status, customer_segment, 
+  relationship_manager, created_at, updated_at
+FROM customers
+WHERE 
+  (:customerNumber IS NULL OR customer_number = :customerNumber)
+  AND (:status IS NULL OR status = :status)
+  AND (:lastName IS NULL OR last_name ILIKE '%' || :lastName || '%')
+  AND (:taxId IS NULL OR tax_id = :taxId)
+ORDER BY created_at DESC
+LIMIT (:limit)::integer OFFSET (:offset)::integer]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+      </db:select>
+
+      <ee:transform doc:name="Transform to Customer Response">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ((customer) -> {
+  id: customer.id,
+  customerNumber: customer.customer_number,
+  party: {
+    partyType: customer.party_type,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    middleName: customer.middle_name,
+    organizationName: customer.organization_name,
+    dateOfBirth: customer.date_of_birth,
+    taxId: customer.tax_id
+  },
+  status: customer.status,
+  customerSegment: customer.customer_segment,
+  relationshipManager: customer.relationship_manager,
+  createdAt: customer.created_at,
+  updatedAt: customer.updated_at
+})]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
+      
+      <error-handler>
+        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "DATABASE_ERROR",
+    message: "An error occurred while querying the database",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "VALIDATION_ERROR",
+    message: error.description default "Invalid request parameters",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:VALIDATION_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+  <!-- POST /customers - Business Logic Flow -->
+  <flow name="create-customer-business-logic" doc:name="create-customer-business-logic">
+    <ee:transform doc:name="Transform Request to DB Format">
+      <ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var party = payload.party default {}
+---
+{
+  customer_number: payload.customerNumber default null,
+  party_type: party.partyType,
+  first_name: party.firstName default null,
+  last_name: party.lastName default null,
+  middle_name: party.middleName default null,
+  organization_name: party.organizationName default null,
+  date_of_birth: party.dateOfBirth default null,
+  tax_id: party.taxId default null,
+  status: payload.status default 'Active',
+  customer_segment: payload.customerSegment default null,
+  relationship_manager: payload.relationshipManager default null
+}]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+
+    <try doc:name="Try">
+      <db:insert doc:name="Insert Customer" config-ref="Database_Config">
+        <db:sql><![CDATA[INSERT INTO customers (
+  customer_number, party_type, first_name, last_name, middle_name,
+  organization_name, date_of_birth, tax_id, status, customer_segment,
+  relationship_manager, created_at, updated_at
+) VALUES (
+  :customer_number, :party_type, :first_name, :last_name, :middle_name,
+  :organization_name, :date_of_birth, :tax_id, :status, :customer_segment,
+  :relationship_manager, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+)
+RETURNING id, customer_number, party_type, first_name, last_name, middle_name,
+  organization_name, date_of_birth, tax_id, status, customer_segment,
+  relationship_manager, created_at, updated_at]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+      </db:insert>
+
+      <ee:transform doc:name="Transform Response">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var customer = payload[0]
+---
+{
+  id: customer.id,
+  customerNumber: customer.customer_number,
+  party: {
+    partyType: customer.party_type,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    middleName: customer.middle_name,
+    organizationName: customer.organization_name,
+    dateOfBirth: customer.date_of_birth,
+    taxId: customer.tax_id
+  },
+  status: customer.status,
+  customerSegment: customer.customer_segment,
+  relationshipManager: customer.relationship_manager,
+  createdAt: customer.created_at,
+  updatedAt: customer.updated_at
+}]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
+      
+      <error-handler>
+        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "DATABASE_ERROR",
+    message: "An error occurred while creating the customer",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "VALIDATION_ERROR",
+    message: error.description default "Invalid request body",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:VALIDATION_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+  <!-- GET /customers/{customerId} - Business Logic Flow -->
+  <flow name="get-customer-by-id-business-logic" doc:name="get-customer-by-id-business-logic">
+    <try doc:name="Try">
+      <db:select doc:name="Select Customer by ID" config-ref="Database_Config">
+        <db:sql><![CDATA[SELECT 
+  id, customer_number, party_type, first_name, last_name, middle_name,
+  organization_name, date_of_birth, tax_id, status, customer_segment,
+  relationship_manager, created_at, updated_at
+FROM customers
+WHERE id = :customerId]]></db:sql>
+        <db:input-parameters><![CDATA[#[{customerId: vars.customerId}]]]></db:input-parameters>
+      </db:select>
+
+      <choice doc:name="Customer Found?">
+        <when expression="#[sizeOf(payload) > 0]">
+          <ee:transform doc:name="Transform Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var customer = payload[0]
+---
+{
+  id: customer.id,
+  customerNumber: customer.customer_number,
+  party: {
+    partyType: customer.party_type,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    middleName: customer.middle_name,
+    organizationName: customer.organization_name,
+    dateOfBirth: customer.date_of_birth,
+    taxId: customer.tax_id
+  },
+  status: customer.status,
+  customerSegment: customer.customer_segment,
+  relationshipManager: customer.relationship_manager,
+  createdAt: customer.created_at,
+  updatedAt: customer.updated_at
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+        </when>
+        <otherwise>
+          <ee:transform doc:name="Error Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "NOT_FOUND",
+    message: "Customer not found",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="APIKIT:NOT_FOUND" description="Customer not found"/>
+        </otherwise>
+      </choice>
+      
+      <error-handler>
+        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "DATABASE_ERROR",
+    message: "An error occurred while querying the database",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+  <!-- PUT /customers/{customerId} - Business Logic Flow -->
+  <flow name="update-customer-business-logic" doc:name="update-customer-business-logic">
+    <ee:transform doc:name="Transform Request to DB Format">
+      <ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var party = payload.party default {}
+---
+{
+  customerId: vars.customerId,
+  customer_number: payload.customerNumber default null,
+  party_type: party.partyType default null,
+  first_name: party.firstName default null,
+  last_name: party.lastName default null,
+  middle_name: party.middleName default null,
+  organization_name: party.organizationName default null,
+  date_of_birth: party.dateOfBirth default null,
+  tax_id: party.taxId default null,
+  status: payload.status default null,
+  customer_segment: payload.customerSegment default null,
+  relationship_manager: payload.relationshipManager default null
+}]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+
+    <try doc:name="Try">
+      <db:update doc:name="Update Customer" config-ref="Database_Config">
+        <db:sql><![CDATA[UPDATE customers SET
+  customer_number = COALESCE(:customer_number, customer_number),
+  party_type = COALESCE(:party_type, party_type),
+  first_name = COALESCE(:first_name, first_name),
+  last_name = COALESCE(:last_name, last_name),
+  middle_name = COALESCE(:middle_name, middle_name),
+  organization_name = COALESCE(:organization_name, organization_name),
+  date_of_birth = COALESCE(:date_of_birth, date_of_birth),
+  tax_id = COALESCE(:tax_id, tax_id),
+  status = COALESCE(:status, status),
+  customer_segment = COALESCE(:customer_segment, customer_segment),
+  relationship_manager = COALESCE(:relationship_manager, relationship_manager),
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = :customerId
+RETURNING id, customer_number, party_type, first_name, last_name, middle_name,
+  organization_name, date_of_birth, tax_id, status, customer_segment,
+  relationship_manager, created_at, updated_at]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+      </db:update>
+
+      <choice doc:name="Update Successful?">
+        <when expression="#[sizeOf(payload) > 0]">
+          <ee:transform doc:name="Transform Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var customer = payload[0]
+---
+{
+  id: customer.id,
+  customerNumber: customer.customer_number,
+  party: {
+    partyType: customer.party_type,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    middleName: customer.middle_name,
+    organizationName: customer.organization_name,
+    dateOfBirth: customer.date_of_birth,
+    taxId: customer.tax_id
+  },
+  status: customer.status,
+  customerSegment: customer.customer_segment,
+  relationshipManager: customer.relationship_manager,
+  createdAt: customer.created_at,
+  updatedAt: customer.updated_at
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+        </when>
+        <otherwise>
+          <ee:transform doc:name="Error Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "NOT_FOUND",
+    message: "Customer not found",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="APIKIT:NOT_FOUND" description="Customer not found"/>
+        </otherwise>
+      </choice>
+      
+      <error-handler>
+        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "DATABASE_ERROR",
+    message: "An error occurred while updating the customer",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "VALIDATION_ERROR",
+    message: error.description default "Invalid request body",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:VALIDATION_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+  <!-- POST /customers/search - Business Logic Flow -->
+  <flow name="search-customers-business-logic" doc:name="search-customers-business-logic">
+    <ee:transform doc:name="Build Search Query Parameters">
+      <ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var criteria = payload.criteria default {}
+---
+{
+  lastName: criteria.lastName default null,
+  firstName: criteria.firstName default null,
+  taxId: criteria.taxId default null,
+  email: criteria.email default null,
+  phone: criteria.phone default null
+}]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+
+    <try doc:name="Try">
+      <db:select doc:name="Search Customers" config-ref="Database_Config">
+        <db:sql><![CDATA[SELECT 
+  id, customer_number, party_type, first_name, last_name, middle_name,
+  organization_name, date_of_birth, tax_id, status, customer_segment,
+  relationship_manager, created_at, updated_at
+FROM customers
+WHERE 
+  (:lastName IS NULL OR last_name ILIKE '%' || :lastName || '%')
+  AND (:firstName IS NULL OR first_name ILIKE '%' || :firstName || '%')
+  AND (:taxId IS NULL OR tax_id = :taxId)
+ORDER BY last_name, first_name]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+      </db:select>
+
+      <ee:transform doc:name="Transform Response">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ((customer) -> {
+  id: customer.id,
+  customerNumber: customer.customer_number,
+  party: {
+    partyType: customer.party_type,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    middleName: customer.middle_name,
+    organizationName: customer.organization_name,
+    dateOfBirth: customer.date_of_birth,
+    taxId: customer.tax_id
+  },
+  status: customer.status,
+  customerSegment: customer.customer_segment,
+  relationshipManager: customer.relationship_manager,
+  createdAt: customer.created_at,
+  updatedAt: customer.updated_at
+})]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
+      
+      <error-handler>
+        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "DATABASE_ERROR",
+    message: "An error occurred while searching customers",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "VALIDATION_ERROR",
+    message: error.description default "Invalid search criteria",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <raise-error type="CUSTOM:VALIDATION_ERROR" description="#[payload.error.message]"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+</mule>
