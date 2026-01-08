@@ -11,21 +11,48 @@
   <!-- GET /customers - Business Logic Flow -->
   <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
     <try doc:name="Try">
-      <db:select doc:name="Select Customers" config-ref="Database_Config">
-        <db:sql><![CDATA[SELECT 
-  id, customer_number, party_type, first_name, last_name, middle_name, 
-  organization_name, date_of_birth, tax_id, status, customer_segment, 
-  relationship_manager, created_at, updated_at
-FROM customers
-WHERE 
-  (:customerNumber IS NULL OR customer_number = :customerNumber)
-  AND (:status IS NULL OR status = :status)
-  AND (:lastName IS NULL OR last_name ILIKE '%' || :lastName || '%')
-  AND (:taxId IS NULL OR tax_id = :taxId)
-ORDER BY created_at DESC
-LIMIT (:limit)::integer OFFSET (:offset)::integer]]></db:sql>
-        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
-      </db:select>
+      <!-- MOCK: Remplacement de l'appel DB select par des données mockées -->
+      <ee:transform doc:name="Mock Select Customers" doc:id="mock-select-customers">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[
+  {
+    id: 1,
+    customer_number: "CUST001",
+    party_type: "Individual",
+    first_name: "Jean",
+    last_name: "Dupont",
+    middle_name: null,
+    organization_name: null,
+    date_of_birth: "1980-01-15",
+    tax_id: "123456789",
+    status: "Active",
+    customer_segment: "Premium",
+    relationship_manager: "RM001",
+    created_at: "2024-01-01T10:00:00Z",
+    updated_at: "2024-01-01T10:00:00Z"
+  },
+  {
+    id: 2,
+    customer_number: "CUST002",
+    party_type: "Organization",
+    first_name: null,
+    last_name: null,
+    middle_name: null,
+    organization_name: "Acme Corp",
+    date_of_birth: null,
+    tax_id: "987654321",
+    status: "Active",
+    customer_segment: "Corporate",
+    relationship_manager: "RM002",
+    created_at: "2024-01-02T10:00:00Z",
+    updated_at: "2024-01-02T10:00:00Z"
+  }
+] default []]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 
       <ee:transform doc:name="Transform to Customer Response">
         <ee:message>
@@ -117,21 +144,31 @@ var party = payload.party default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <db:insert doc:name="Insert Customer" config-ref="Database_Config">
-        <db:sql><![CDATA[INSERT INTO customers (
-  customer_number, party_type, first_name, last_name, middle_name,
-  organization_name, date_of_birth, tax_id, status, customer_segment,
-  relationship_manager, created_at, updated_at
-) VALUES (
-  :customer_number, :party_type, :first_name, :last_name, :middle_name,
-  :organization_name, :date_of_birth, :tax_id, :status, :customer_segment,
-  :relationship_manager, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-)
-RETURNING id, customer_number, party_type, first_name, last_name, middle_name,
-  organization_name, date_of_birth, tax_id, status, customer_segment,
-  relationship_manager, created_at, updated_at]]></db:sql>
-        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
-      </db:insert>
+      <!-- MOCK: Remplacement de l'appel DB insert par des données mockées -->
+      <ee:transform doc:name="Mock Insert Customer" doc:id="mock-insert-customer">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var data = payload
+---
+[{
+  id: 1,
+  customer_number: data.customer_number default "CUST001",
+  party_type: data.party_type,
+  first_name: data.first_name,
+  last_name: data.last_name,
+  middle_name: data.middle_name,
+  organization_name: data.organization_name,
+  date_of_birth: data.date_of_birth,
+  tax_id: data.tax_id,
+  status: data.status,
+  customer_segment: data.customer_segment,
+  relationship_manager: data.relationship_manager,
+  created_at: now(),
+  updated_at: now()
+}]]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 
       <ee:transform doc:name="Transform Response">
         <ee:message>
@@ -202,15 +239,31 @@ output application/json
   <!-- GET /customers/{customerId} - Business Logic Flow -->
   <flow name="get-customer-by-id-business-logic" doc:name="get-customer-by-id-business-logic">
     <try doc:name="Try">
-      <db:select doc:name="Select Customer by ID" config-ref="Database_Config">
-        <db:sql><![CDATA[SELECT 
-  id, customer_number, party_type, first_name, last_name, middle_name,
-  organization_name, date_of_birth, tax_id, status, customer_segment,
-  relationship_manager, created_at, updated_at
-FROM customers
-WHERE id = :customerId]]></db:sql>
-        <db:input-parameters><![CDATA[#[{customerId: vars.customerId}]]]></db:input-parameters>
-      </db:select>
+      <!-- MOCK: Remplacement de l'appel DB select par des données mockées -->
+      <ee:transform doc:name="Mock Select Customer by ID" doc:id="mock-select-customer-by-id">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var customerId = vars.customerId default 1
+---
+[{
+  id: customerId,
+  customer_number: "CUST001",
+  party_type: "Individual",
+  first_name: "Jean",
+  last_name: "Dupont",
+  middle_name: null,
+  organization_name: null,
+  date_of_birth: "1980-01-15",
+  tax_id: "123456789",
+  status: "Active",
+  customer_segment: "Premium",
+  relationship_manager: "RM001",
+  created_at: "2024-01-01T10:00:00Z",
+  updated_at: "2024-01-01T10:00:00Z"
+}] default []]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 
       <choice doc:name="Customer Found?">
         <when expression="#[sizeOf(payload) > 0]">
@@ -308,26 +361,31 @@ var party = payload.party default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <db:update doc:name="Update Customer" config-ref="Database_Config">
-        <db:sql><![CDATA[UPDATE customers SET
-  customer_number = COALESCE(:customer_number, customer_number),
-  party_type = COALESCE(:party_type, party_type),
-  first_name = COALESCE(:first_name, first_name),
-  last_name = COALESCE(:last_name, last_name),
-  middle_name = COALESCE(:middle_name, middle_name),
-  organization_name = COALESCE(:organization_name, organization_name),
-  date_of_birth = COALESCE(:date_of_birth, date_of_birth),
-  tax_id = COALESCE(:tax_id, tax_id),
-  status = COALESCE(:status, status),
-  customer_segment = COALESCE(:customer_segment, customer_segment),
-  relationship_manager = COALESCE(:relationship_manager, relationship_manager),
-  updated_at = CURRENT_TIMESTAMP
-WHERE id = :customerId
-RETURNING id, customer_number, party_type, first_name, last_name, middle_name,
-  organization_name, date_of_birth, tax_id, status, customer_segment,
-  relationship_manager, created_at, updated_at]]></db:sql>
-        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
-      </db:update>
+      <!-- MOCK: Remplacement de l'appel DB update par des données mockées -->
+      <ee:transform doc:name="Mock Update Customer" doc:id="mock-update-customer">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var data = payload
+---
+[{
+  id: data.customerId,
+  customer_number: data.customer_number default "CUST001",
+  party_type: data.party_type default "Individual",
+  first_name: data.first_name default "Jean",
+  last_name: data.last_name default "Dupont",
+  middle_name: data.middle_name,
+  organization_name: data.organization_name,
+  date_of_birth: data.date_of_birth default "1980-01-15",
+  tax_id: data.tax_id default "123456789",
+  status: data.status default "Active",
+  customer_segment: data.customer_segment default "Premium",
+  relationship_manager: data.relationship_manager default "RM001",
+  created_at: "2024-01-01T10:00:00Z",
+  updated_at: now()
+}]]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 
       <choice doc:name="Update Successful?">
         <when expression="#[sizeOf(payload) > 0]">
@@ -435,19 +493,32 @@ var criteria = payload.criteria default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <db:select doc:name="Search Customers" config-ref="Database_Config">
-        <db:sql><![CDATA[SELECT 
-  id, customer_number, party_type, first_name, last_name, middle_name,
-  organization_name, date_of_birth, tax_id, status, customer_segment,
-  relationship_manager, created_at, updated_at
-FROM customers
-WHERE 
-  (:lastName IS NULL OR last_name ILIKE '%' || :lastName || '%')
-  AND (:firstName IS NULL OR first_name ILIKE '%' || :firstName || '%')
-  AND (:taxId IS NULL OR tax_id = :taxId)
-ORDER BY last_name, first_name]]></db:sql>
-        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
-      </db:select>
+      <!-- MOCK: Remplacement de l'appel DB select par des données mockées -->
+      <ee:transform doc:name="Mock Search Customers" doc:id="mock-search-customers">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[
+  {
+    id: 1,
+    customer_number: "CUST001",
+    party_type: "Individual",
+    first_name: "Jean",
+    last_name: "Dupont",
+    middle_name: null,
+    organization_name: null,
+    date_of_birth: "1980-01-15",
+    tax_id: "123456789",
+    status: "Active",
+    customer_segment: "Premium",
+    relationship_manager: "RM001",
+    created_at: "2024-01-01T10:00:00Z",
+    updated_at: "2024-01-01T10:00:00Z"
+  }
+] default []]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 
       <ee:transform doc:name="Transform Response">
         <ee:message>
