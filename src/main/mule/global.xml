@@ -4,11 +4,9 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:http="http://www.mulesoft.org/schema/mule/http"
   xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-  xmlns:db="http://www.mulesoft.org/schema/mule/db"
   xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
   http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-  http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
   
   <!-- HTTP Listener Configuration -->
   <http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config">
@@ -17,15 +15,5 @@
 
   <!-- Configuration Properties -->
   <configuration-properties file="config.properties" doc:name="Configuration properties"/>
-
-  <!-- Supabase Database Configuration -->
-  <db:config name="Database_Config" doc:name="Database Config">
-    <db:generic-connection 
-      driverClassName="org.postgresql.Driver" 
-      url="${supabase.db.url}" 
-      user="${supabase.db.user}" 
-      password="${supabase.db.password}">
-    </db:generic-connection>
-  </db:config>
 
 </mule>

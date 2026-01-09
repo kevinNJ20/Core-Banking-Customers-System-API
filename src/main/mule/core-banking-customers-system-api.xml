@@ -1,54 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
-  xmlns:db="http://www.mulesoft.org/schema/mule/db"
   xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
   xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-  http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
   http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
   <!-- GET /customers - Business Logic Flow -->
   <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel DB select par des données mockées -->
-      <ee:transform doc:name="Mock Select Customers" doc:id="mock-select-customers">
+      <ee:transform doc:name="Mock Select Customers">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
+var params = payload default {}
 ---
+// Mock data - simulating database query results
 [
   {
-    id: 1,
-    customer_number: "CUST001",
+    id: "cust-001",
+    customer_number: params.customerNumber default "CUST-000001",
     party_type: "Individual",
-    first_name: "Jean",
-    last_name: "Dupont",
+    first_name: "John",
+    last_name: params.lastName default "Doe",
     middle_name: null,
     organization_name: null,
-    date_of_birth: "1980-01-15",
-    tax_id: "123456789",
-    status: "Active",
-    customer_segment: "Premium",
-    relationship_manager: "RM001",
-    created_at: "2024-01-01T10:00:00Z",
-    updated_at: "2024-01-01T10:00:00Z"
+    date_of_birth: "1990-01-15" as Date,
+    tax_id: params.taxId default "TAX-123456",
+    status: params.status default "Active",
+    customer_segment: "Retail",
+    relationship_manager: "RM-001",
+    created_at: "2024-01-15T00:00:00Z" as DateTime,
+    updated_at: "2024-01-20T00:00:00Z" as DateTime
   },
   {
-    id: 2,
-    customer_number: "CUST002",
-    party_type: "Organization",
-    first_name: null,
-    last_name: null,
+    id: "cust-002",
+    customer_number: "CUST-000002",
+    party_type: "Individual",
+    first_name: "Jane",
+    last_name: "Smith",
     middle_name: null,
-    organization_name: "Acme Corp",
-    date_of_birth: null,
-    tax_id: "987654321",
+    organization_name: null,
+    date_of_birth: "1985-05-20" as Date,
+    tax_id: "TAX-789012",
     status: "Active",
-    customer_segment: "Corporate",
-    relationship_manager: "RM002",
-    created_at: "2024-01-02T10:00:00Z",
-    updated_at: "2024-01-02T10:00:00Z"
+    customer_segment: "Premium",
+    relationship_manager: "RM-002",
+    created_at: "2024-02-01T00:00:00Z" as DateTime,
+    updated_at: "2024-02-01T00:00:00Z" as DateTime
   }
 ] default []]]></ee:set-payload>
         </ee:message>
@@ -81,7 +80,7 @@ payload map ((customer) -> {
       </ee:transform>
       
       <error-handler>
-        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -98,7 +97,7 @@ output application/json
           </ee:transform>
           <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
         </on-error-propagate>
-        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+        <on-error-propagate type="VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -144,26 +143,26 @@ var party = payload.party default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel DB insert par des données mockées -->
-      <ee:transform doc:name="Mock Insert Customer" doc:id="mock-insert-customer">
+      <ee:transform doc:name="Mock Insert Customer">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
-var data = payload
+var req = payload
 ---
+// Mock insert - return created customer
 [{
-  id: 1,
-  customer_number: data.customer_number default "CUST001",
-  party_type: data.party_type,
-  first_name: data.first_name,
-  last_name: data.last_name,
-  middle_name: data.middle_name,
-  organization_name: data.organization_name,
-  date_of_birth: data.date_of_birth,
-  tax_id: data.tax_id,
-  status: data.status,
-  customer_segment: data.customer_segment,
-  relationship_manager: data.relationship_manager,
+  id: "cust-" ++ (now() as String {format: "yyyyMMddHHmmssSSS"}),
+  customer_number: req.customer_number default "CUST-" ++ (now() as String {format: "yyyyMMddHHmmss"}),
+  party_type: req.party_type,
+  first_name: req.first_name default null,
+  last_name: req.last_name default null,
+  middle_name: req.middle_name default null,
+  organization_name: req.organization_name default null,
+  date_of_birth: req.date_of_birth default null,
+  tax_id: req.tax_id default null,
+  status: req.status default "Active",
+  customer_segment: req.customer_segment default null,
+  relationship_manager: req.relationship_manager default null,
   created_at: now(),
   updated_at: now()
 }]]]></ee:set-payload>
@@ -198,7 +197,7 @@ var customer = payload[0]
       </ee:transform>
       
       <error-handler>
-        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -215,7 +214,7 @@ output application/json
           </ee:transform>
           <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
         </on-error-propagate>
-        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+        <on-error-propagate type="VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -239,29 +238,32 @@ output application/json
   <!-- GET /customers/{customerId} - Business Logic Flow -->
   <flow name="get-customer-by-id-business-logic" doc:name="get-customer-by-id-business-logic">
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel DB select par des données mockées -->
-      <ee:transform doc:name="Mock Select Customer by ID" doc:id="mock-select-customer-by-id">
+      <ee:transform doc:name="Mock Select Customer by ID">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
-var customerId = vars.customerId default 1
+var customerId = vars.customerId
 ---
-[{
-  id: customerId,
-  customer_number: "CUST001",
-  party_type: "Individual",
-  first_name: "Jean",
-  last_name: "Dupont",
-  middle_name: null,
-  organization_name: null,
-  date_of_birth: "1980-01-15",
-  tax_id: "123456789",
-  status: "Active",
-  customer_segment: "Premium",
-  relationship_manager: "RM001",
-  created_at: "2024-01-01T10:00:00Z",
-  updated_at: "2024-01-01T10:00:00Z"
-}] default []]]></ee:set-payload>
+// Mock data - return customer if customerId matches, otherwise empty array
+if (customerId != null and customerId != "")
+  [{
+    id: customerId,
+    customer_number: "CUST-000001",
+    party_type: "Individual",
+    first_name: "John",
+    last_name: "Doe",
+    middle_name: null,
+    organization_name: null,
+    date_of_birth: "1990-01-15" as Date,
+    tax_id: "TAX-123456",
+    status: "Active",
+    customer_segment: "Retail",
+    relationship_manager: "RM-001",
+    created_at: "2024-01-15T00:00:00Z" as DateTime,
+    updated_at: "2024-01-20T00:00:00Z" as DateTime
+  }]
+else
+  []]]></ee:set-payload>
         </ee:message>
       </ee:transform>
 
@@ -309,12 +311,12 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <raise-error type="APIKIT:NOT_FOUND" description="Customer not found"/>
+          <raise-error type="CUSTOM:NOT_FOUND" description="Customer not found"/>
         </otherwise>
       </choice>
       
       <error-handler>
-        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -361,29 +363,33 @@ var party = payload.party default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel DB update par des données mockées -->
-      <ee:transform doc:name="Mock Update Customer" doc:id="mock-update-customer">
+      <ee:transform doc:name="Mock Update Customer">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
-var data = payload
+var req = payload
+var customerId = req.customerId
 ---
-[{
-  id: data.customerId,
-  customer_number: data.customer_number default "CUST001",
-  party_type: data.party_type default "Individual",
-  first_name: data.first_name default "Jean",
-  last_name: data.last_name default "Dupont",
-  middle_name: data.middle_name,
-  organization_name: data.organization_name,
-  date_of_birth: data.date_of_birth default "1980-01-15",
-  tax_id: data.tax_id default "123456789",
-  status: data.status default "Active",
-  customer_segment: data.customer_segment default "Premium",
-  relationship_manager: data.relationship_manager default "RM001",
-  created_at: "2024-01-01T10:00:00Z",
-  updated_at: now()
-}]]]></ee:set-payload>
+// Mock update - return updated customer if customerId exists
+if (customerId != null and customerId != "")
+  [{
+    id: customerId,
+    customer_number: req.customer_number default "CUST-000001",
+    party_type: req.party_type default "Individual",
+    first_name: req.first_name default "John",
+    last_name: req.last_name default "Doe",
+    middle_name: req.middle_name default null,
+    organization_name: req.organization_name default null,
+    date_of_birth: req.date_of_birth default ("1990-01-15" as Date),
+    tax_id: req.tax_id default "TAX-123456",
+    status: req.status default "Active",
+    customer_segment: req.customer_segment default "Retail",
+    relationship_manager: req.relationship_manager default "RM-001",
+    created_at: "2024-01-15T00:00:00Z" as DateTime,
+    updated_at: now()
+  }]
+else
+  []]]></ee:set-payload>
         </ee:message>
       </ee:transform>
 
@@ -431,12 +437,12 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <raise-error type="APIKIT:NOT_FOUND" description="Customer not found"/>
+          <raise-error type="CUSTOM:NOT_FOUND" description="Customer not found"/>
         </otherwise>
       </choice>
       
       <error-handler>
-        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -453,7 +459,7 @@ output application/json
           </ee:transform>
           <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
         </on-error-propagate>
-        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+        <on-error-propagate type="VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -493,28 +499,29 @@ var criteria = payload.criteria default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel DB select par des données mockées -->
-      <ee:transform doc:name="Mock Search Customers" doc:id="mock-search-customers">
+      <ee:transform doc:name="Mock Search Customers">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
+var params = payload default {}
 ---
+// Mock search results
 [
   {
-    id: 1,
-    customer_number: "CUST001",
+    id: "cust-001",
+    customer_number: "CUST-000001",
     party_type: "Individual",
-    first_name: "Jean",
-    last_name: "Dupont",
+    first_name: params.firstName default "John",
+    last_name: params.lastName default "Doe",
     middle_name: null,
     organization_name: null,
-    date_of_birth: "1980-01-15",
-    tax_id: "123456789",
+    date_of_birth: "1990-01-15" as Date,
+    tax_id: params.taxId default "TAX-123456",
     status: "Active",
-    customer_segment: "Premium",
-    relationship_manager: "RM001",
-    created_at: "2024-01-01T10:00:00Z",
-    updated_at: "2024-01-01T10:00:00Z"
+    customer_segment: "Retail",
+    relationship_manager: "RM-001",
+    created_at: "2024-01-15T00:00:00Z" as DateTime,
+    updated_at: "2024-01-20T00:00:00Z" as DateTime
   }
 ] default []]]></ee:set-payload>
         </ee:message>
@@ -547,7 +554,7 @@ payload map ((customer) -> {
       </ee:transform>
       
       <error-handler>
-        <on-error-propagate type="DB:QUERY_EXECUTION,DB:CONNECTIVITY" enableNotifications="true" logException="true" doc:name="Database Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -564,7 +571,7 @@ output application/json
           </ee:transform>
           <raise-error type="CUSTOM:DATABASE_ERROR" description="#[payload.error.message]"/>
         </on-error-propagate>
-        <on-error-propagate type="VALIDATION:INVALID_VALUE,VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
+        <on-error-propagate type="VALIDATION:NOT_NULL" enableNotifications="true" logException="true" doc:name="Validation Error">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0

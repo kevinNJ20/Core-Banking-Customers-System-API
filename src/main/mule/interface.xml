@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+<mule xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
       xmlns:http="http://www.mulesoft.org/schema/mule/http"
       xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
       xmlns="http://www.mulesoft.org/schema/mule/core"
@@ -7,9 +7,8 @@
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
       http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-      http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
-      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd">
+      http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
   <!-- APIkit Router Configuration -->
   <apikit:config name="core-banking-customers-system-api-config" 
@@ -20,7 +19,7 @@ http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/m
   <!-- Main HTTP Listener with APIkit Router -->
   <flow name="main">
     <http:listener config-ref="HTTP_Listener_config" path="/api/*" doc:name="HTTP Listener"/>
-    <apikit:router doc:name="APIkit Router" doc:id="1f568599-e7e8-466c-af9f-46d9d173df83" config-ref="core-banking-customers-system-api-config"/>
+    <apikit:router config-ref="core-banking-customers-system-api-config" doc:name="APIkit Router"/>
     <error-handler>
       <on-error-propagate type="APIKIT:NOT_FOUND" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -37,7 +36,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-        <set-variable value="404" doc:name="httpStatus" doc:id="a8159ca6-75e2-44fd-9b41-f73056469b34" variableName="httpStatus"/>
+        <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:BAD_REQUEST" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -54,7 +53,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="400" doc:name="httpStatus" doc:id="53eed608-7934-4bf5-8f19-71004219147d" variableName="httpStatus" />
+        <set-variable value="400" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:NOT_ACCEPTABLE" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -71,7 +70,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="406" doc:name="httpStatus" doc:id="f78f38ac-778c-48df-a0e8-1dc064d42929" variableName="httpStatus" />
+        <set-variable value="406" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -88,7 +87,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="415" doc:name="httpStatus" doc:id="1f89da3e-9968-4305-97a9-90ba7b6ccb03" variableName="httpStatus" />
+        <set-variable value="415" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -105,7 +104,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="405" doc:name="httpStatus" doc:id="d197f0ff-2b37-44a4-aef3-2f648e0f9327" variableName="httpStatus" />
+        <set-variable value="405" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
     </error-handler>
   </flow>
@@ -137,22 +136,8 @@ output application/java
 
   <!-- GET /customers/{customerId} -->
   <flow name="get:\customers\(customerId):core-banking-customers-system-api-config">
-    <ee:transform doc:name="Extract Customer ID" doc:id="d44d01ba-ab6e-4f4e-aa15-db137a76c037" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/java
----
-{
-}]]></ee:set-payload>
-			</ee:message>
-			<ee:variables >
-				<ee:set-variable variableName="customerId" ><![CDATA[%dw 2.0
-output application/java
----
-attributes.uriParams.customerId]]></ee:set-variable>
-			</ee:variables>
-		</ee:transform>
-		<flow-ref name="get-customer-by-id-business-logic" doc:name="get-customer-by-id-business-logic"/>
+    <set-variable value="#[attributes.uriParams.customerId]" variableName="customerId" doc:name="Set Customer ID"/>
+    <flow-ref name="get-customer-by-id-business-logic" doc:name="get-customer-by-id-business-logic"/>
   </flow>
 
   <!-- PUT /customers/{customerId} -->
