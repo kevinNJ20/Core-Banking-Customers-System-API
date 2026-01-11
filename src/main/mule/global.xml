@@ -4,16 +4,21 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:http="http://www.mulesoft.org/schema/mule/http"
   xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
   xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
   http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+  http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd">
   
   <!-- HTTP Listener Configuration -->
   <http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config">
-    <http:listener-connection host="0.0.0.0" port="8081" />
+    <http:listener-connection host="${http.host}" port="${http.port}" />
   </http:listener-config>
 
   <!-- Configuration Properties -->
   <configuration-properties file="config.properties" doc:name="Configuration properties"/>
+
+  <!-- APIkit Router Configuration -->
+  <apikit:config outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" doc:name="Router" doc:id="core-banking-customers-config" name="core-banking-customers-system-api-config" api="core-banking-customers-system-api.raml"/>
 
 </mule>
