@@ -131,7 +131,7 @@ output application/java
   </flow>
 
   <!-- POST /customers -->
-  <flow name="post:\customers:core-banking-customers-system-api-config">
+  <flow name="post:\customers:application\json:core-banking-customers-system-api-config">
     <flow-ref name="create-customer-business-logic" doc:name="create-customer-business-logic"/>
   </flow>
 
@@ -142,13 +142,13 @@ output application/java
   </flow>
 
   <!-- PUT /customers/{customerId} -->
-  <flow name="put:\customers\(customerId):core-banking-customers-system-api-config">
+  <flow name="put:\customers\(customerId):application\json:core-banking-customers-system-api-config">
     <set-variable value="#[attributes.uriParams.customerId]" variableName="customerId" doc:name="Set Customer ID"/>
     <flow-ref name="update-customer-business-logic" doc:name="update-customer-business-logic"/>
   </flow>
 
   <!-- POST /customers/search -->
-  <flow name="post:\customers\search:core-banking-customers-system-api-config">
+  <flow name="post:\customers\search:application\json:core-banking-customers-system-api-config">
     <flow-ref name="search-customers-business-logic" doc:name="search-customers-business-logic"/>
   </flow>
 
