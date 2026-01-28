@@ -3,55 +3,28 @@
   xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
   xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
   xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+  http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+	http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
 
   <!-- GET /customers - Business Logic Flow -->
   <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
     <try doc:name="Try">
-      <ee:transform doc:name="Mock Select Customers">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var params = payload default {}
----
-// Mock data - simulating database query results
-[
-  {
-    id: "cust-001",
-    customer_number: params.customerNumber default "CUST-000001",
-    party_type: "Individual",
-    first_name: "John",
-    last_name: params.lastName default "Doe",
-    middle_name: null,
-    organization_name: null,
-    date_of_birth: "1990-01-15" as Date,
-    tax_id: params.taxId default "TAX-123456",
-    status: params.status default "Active",
-    customer_segment: "Retail",
-    relationship_manager: "RM-001",
-    created_at: "2024-01-15T00:00:00Z" as DateTime,
-    updated_at: "2024-01-20T00:00:00Z" as DateTime
-  },
-  {
-    id: "cust-002",
-    customer_number: "CUST-000002",
-    party_type: "Individual",
-    first_name: "Jane",
-    last_name: "Smith",
-    middle_name: null,
-    organization_name: null,
-    date_of_birth: "1985-05-20" as Date,
-    tax_id: "TAX-789012",
-    status: "Active",
-    customer_segment: "Premium",
-    relationship_manager: "RM-002",
-    created_at: "2024-02-01T00:00:00Z" as DateTime,
-    updated_at: "2024-02-01T00:00:00Z" as DateTime
-  }
-] default []]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+      <db:select config-ref="Database_Config" doc:name="Select Customers">
+        <db:sql><![CDATA[
+          SELECT *
+          FROM customers
+          WHERE
+            (:customerNumber IS NULL OR customer_number = :customerNumber)
+            AND (:lastName IS NULL OR last_name = :lastName)
+            AND (:taxId IS NULL OR tax_id = :taxId)
+            AND (:status IS NULL OR status = :status)
+          ORDER BY created_at DESC
+          LIMIT :limit::integer OFFSET :offset::integer
+        ]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload default {}]]]></db:input-parameters>
+      </db:select>
 
       <ee:transform doc:name="Transform to Customer Response">
         <ee:message>
@@ -59,7 +32,7 @@ var params = payload default {}
 output application/json
 ---
 payload map ((customer) -> {
-  id: customer.id,
+  id: customer.id as String,
   customerNumber: customer.customer_number,
   party: {
     partyType: customer.party_type,
@@ -143,31 +116,20 @@ var party = payload.party default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <ee:transform doc:name="Mock Insert Customer">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var req = payload
----
-// Mock insert - return created customer
-[{
-  id: "cust-" ++ (now() as String {format: "yyyyMMddHHmmssSSS"}),
-  customer_number: req.customer_number default "CUST-" ++ (now() as String {format: "yyyyMMddHHmmss"}),
-  party_type: req.party_type,
-  first_name: req.first_name default null,
-  last_name: req.last_name default null,
-  middle_name: req.middle_name default null,
-  organization_name: req.organization_name default null,
-  date_of_birth: req.date_of_birth default null,
-  tax_id: req.tax_id default null,
-  status: req.status default "Active",
-  customer_segment: req.customer_segment default null,
-  relationship_manager: req.relationship_manager default null,
-  created_at: now(),
-  updated_at: now()
-}]]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+      <db:insert config-ref="Database_Config" doc:name="Insert Customer">
+        <db:sql><![CDATA[
+          INSERT INTO customers (
+            customer_number, party_type, first_name, last_name, middle_name,
+            organization_name, date_of_birth, tax_id, status, customer_segment, relationship_manager
+          )
+          VALUES (
+            :customer_number, :party_type, :first_name, :last_name, :middle_name,
+            :organization_name, :date_of_birth::date, :tax_id, :status, :customer_segment, :relationship_manager
+          )
+          RETURNING *
+        ]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+      </db:insert>
 
       <ee:transform doc:name="Transform Response">
         <ee:message>
@@ -176,7 +138,7 @@ output application/json
 var customer = payload[0]
 ---
 {
-  id: customer.id,
+  id: customer.id as String,
   customerNumber: customer.customer_number,
   party: {
     partyType: customer.party_type,
@@ -238,34 +200,16 @@ output application/json
   <!-- GET /customers/{customerId} - Business Logic Flow -->
   <flow name="get-customer-by-id-business-logic" doc:name="get-customer-by-id-business-logic">
     <try doc:name="Try">
-      <ee:transform doc:name="Mock Select Customer by ID">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var customerId = vars.customerId
----
-// Mock data - return customer if customerId matches, otherwise empty array
-if (customerId != null and customerId != "")
-  [{
-    id: customerId,
-    customer_number: "CUST-000001",
-    party_type: "Individual",
-    first_name: "John",
-    last_name: "Doe",
-    middle_name: null,
-    organization_name: null,
-    date_of_birth: "1990-01-15" as Date,
-    tax_id: "TAX-123456",
-    status: "Active",
-    customer_segment: "Retail",
-    relationship_manager: "RM-001",
-    created_at: "2024-01-15T00:00:00Z" as DateTime,
-    updated_at: "2024-01-20T00:00:00Z" as DateTime
-  }]
-else
-  []]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+      <db:select config-ref="Database_Config" doc:name="Select Customer by ID">
+        <db:sql><![CDATA[
+          SELECT *
+          FROM customers
+          WHERE id = :customerId::uuid
+        ]]></db:sql>
+        <db:input-parameters><![CDATA[#[{
+          customerId: vars.customerId
+        }]]]></db:input-parameters>
+      </db:select>
 
       <choice doc:name="Customer Found?">
         <when expression="#[sizeOf(payload) > 0]">
@@ -276,7 +220,7 @@ output application/json
 var customer = payload[0]
 ---
 {
-  id: customer.id,
+  id: customer.id as String,
   customerNumber: customer.customer_number,
   party: {
     partyType: customer.party_type,
@@ -363,35 +307,27 @@ var party = payload.party default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <ee:transform doc:name="Mock Update Customer">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var req = payload
-var customerId = req.customerId
----
-// Mock update - return updated customer if customerId exists
-if (customerId != null and customerId != "")
-  [{
-    id: customerId,
-    customer_number: req.customer_number default "CUST-000001",
-    party_type: req.party_type default "Individual",
-    first_name: req.first_name default "John",
-    last_name: req.last_name default "Doe",
-    middle_name: req.middle_name default null,
-    organization_name: req.organization_name default null,
-    date_of_birth: req.date_of_birth default ("1990-01-15" as Date),
-    tax_id: req.tax_id default "TAX-123456",
-    status: req.status default "Active",
-    customer_segment: req.customer_segment default "Retail",
-    relationship_manager: req.relationship_manager default "RM-001",
-    created_at: "2024-01-15T00:00:00Z" as DateTime,
-    updated_at: now()
-  }]
-else
-  []]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+      <db:update config-ref="Database_Config" doc:name="Update Customer">
+        <db:sql><![CDATA[
+          UPDATE customers
+          SET
+            customer_number = COALESCE(:customer_number, customer_number),
+            party_type = COALESCE(:party_type, party_type),
+            first_name = COALESCE(:first_name, first_name),
+            last_name = COALESCE(:last_name, last_name),
+            middle_name = COALESCE(:middle_name, middle_name),
+            organization_name = COALESCE(:organization_name, organization_name),
+            date_of_birth = COALESCE(:date_of_birth::date, date_of_birth),
+            tax_id = COALESCE(:tax_id, tax_id),
+            status = COALESCE(:status, status),
+            customer_segment = COALESCE(:customer_segment, customer_segment),
+            relationship_manager = COALESCE(:relationship_manager, relationship_manager),
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = :customerId::uuid
+          RETURNING *
+        ]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
+      </db:update>
 
       <choice doc:name="Update Successful?">
         <when expression="#[sizeOf(payload) > 0]">
@@ -402,7 +338,7 @@ output application/json
 var customer = payload[0]
 ---
 {
-  id: customer.id,
+  id: customer.id as String,
   customerNumber: customer.customer_number,
   party: {
     partyType: customer.party_type,
@@ -499,33 +435,19 @@ var criteria = payload.criteria default {}
     </ee:transform>
 
     <try doc:name="Try">
-      <ee:transform doc:name="Mock Search Customers">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var params = payload default {}
----
-// Mock search results
-[
-  {
-    id: "cust-001",
-    customer_number: "CUST-000001",
-    party_type: "Individual",
-    first_name: params.firstName default "John",
-    last_name: params.lastName default "Doe",
-    middle_name: null,
-    organization_name: null,
-    date_of_birth: "1990-01-15" as Date,
-    tax_id: params.taxId default "TAX-123456",
-    status: "Active",
-    customer_segment: "Retail",
-    relationship_manager: "RM-001",
-    created_at: "2024-01-15T00:00:00Z" as DateTime,
-    updated_at: "2024-01-20T00:00:00Z" as DateTime
-  }
-] default []]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+      <db:select config-ref="Database_Config" doc:name="Search Customers">
+        <db:sql><![CDATA[
+          SELECT *
+          FROM customers
+          WHERE
+            (:lastName IS NULL OR last_name ILIKE '%' || :lastName || '%')
+            AND (:firstName IS NULL OR first_name ILIKE '%' || :firstName || '%')
+            AND (:taxId IS NULL OR tax_id = :taxId)
+          ORDER BY created_at DESC
+          LIMIT 100
+        ]]></db:sql>
+        <db:input-parameters><![CDATA[#[payload default {}]]]></db:input-parameters>
+      </db:select>
 
       <ee:transform doc:name="Transform Response">
         <ee:message>
@@ -533,7 +455,7 @@ var params = payload default {}
 output application/json
 ---
 payload map ((customer) -> {
-  id: customer.id,
+  id: customer.id as String,
   customerNumber: customer.customer_number,
   party: {
     partyType: customer.party_type,
