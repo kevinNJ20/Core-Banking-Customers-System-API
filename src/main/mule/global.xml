@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
   xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:http="http://www.mulesoft.org/schema/mule/http"
   xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
   xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
-  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+  xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
   http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
   http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
   http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd">
@@ -20,5 +22,7 @@
 
   <!-- APIkit Router Configuration -->
   <apikit:config outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" doc:name="Router" doc:id="core-banking-customers-config" name="core-banking-customers-system-api-config" api="core-banking-customers-system-api.raml"/>
-
+  <db:config name="Database_Config" doc:name="Database Config" doc:id="13380dcc-7353-4aad-a742-00262bb176da" >
+		<db:generic-connection url="jdbc:postgresql://aws-1-eu-west-1.pooler.supabase.com:5432/postgres" driverClassName="org.postgresql.Driver" user="postgres.vvfdezdptopljymzoivz" password="Jake902479%" />
+	</db:config>
 </mule>
