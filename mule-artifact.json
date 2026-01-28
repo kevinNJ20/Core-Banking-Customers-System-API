@@ -1,7 +1,5 @@
 {
-  "name": "core-banking-customers-system-api",
-  "minMuleVersion": "4.10.0",
-  "javaSpecificationVersions": [
-    "17"
-  ]
+    "name": "core-banking-customers-system-api",
+    "minMuleVersion": "4.10.0",
+    "javaSpecificationVersions": ["17"]
 }
