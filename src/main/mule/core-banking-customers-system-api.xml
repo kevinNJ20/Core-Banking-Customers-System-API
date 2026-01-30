@@ -16,12 +16,12 @@
           SELECT *
           FROM customers
           WHERE
-            (:customerNumber IS NULL OR customer_number = :customerNumber)
-            AND (:lastName IS NULL OR last_name = :lastName)
-            AND (:taxId IS NULL OR tax_id = :taxId)
-            AND (:status IS NULL OR status = :status)
+            (COALESCE(:customerNumber, '') = '' OR customer_number = :customerNumber)
+            AND (COALESCE(:lastName, '') = '' OR last_name = :lastName)
+            AND (COALESCE(:taxId, '') = '' OR tax_id = :taxId)
+            AND (COALESCE(:status, '') = '' OR status = :status)
           ORDER BY created_at DESC
-          LIMIT :limit::integer OFFSET :offset::integer
+          LIMIT CAST(COALESCE(:limit, '100') AS integer) OFFSET CAST(COALESCE(:offset, '0') AS integer)
         ]]></db:sql>
         <db:input-parameters><![CDATA[#[payload default {}]]]></db:input-parameters>
       </db:select>
@@ -98,22 +98,37 @@ output application/json
         <ee:set-payload><![CDATA[%dw 2.0
 output application/java
 var party = payload.party default {}
+fun normalizePartyType(pt) = 
+  if (pt == null) null
+  else if (pt as String == "Individual" or pt as String == "individual" or pt as String == "INDIVIDUAL") "Individual"
+  else if (pt as String == "Organization" or pt as String == "organization" or pt as String == "ORGANIZATION") "Organization"
+  else pt as String
+fun normalizeStatus(s) = 
+  if (s == null) "Active"
+  else if (s as String == "Active" or s as String == "active" or s as String == "ACTIVE") "Active"
+  else if (s as String == "Inactive" or s as String == "inactive" or s as String == "INACTIVE") "Inactive"
+  else if (s as String == "Suspended" or s as String == "suspended" or s as String == "SUSPENDED") "Suspended"
+  else if (s as String == "Closed" or s as String == "closed" or s as String == "CLOSED") "Closed"
+  else s as String
 ---
 {
   customer_number: payload.customerNumber default null,
-  party_type: party.partyType,
+  party_type: normalizePartyType(party.partyType),
   first_name: party.firstName default null,
   last_name: party.lastName default null,
   middle_name: party.middleName default null,
   organization_name: party.organizationName default null,
   date_of_birth: party.dateOfBirth default null,
   tax_id: party.taxId default null,
-  status: payload.status default 'Active',
+  status: normalizeStatus(payload.status),
   customer_segment: payload.customerSegment default null,
   relationship_manager: payload.relationshipManager default null
 }]]></ee:set-payload>
       </ee:message>
     </ee:transform>
+
+    <set-variable value="#[payload.customer_number]" variableName="customerNumber" doc:name="Store Customer Number" />
+    <set-variable value="#[payload.tax_id]" variableName="taxId" doc:name="Store Tax ID" />
 
     <try doc:name="Try">
       <db:insert config-ref="Database_Config" doc:name="Insert Customer">
@@ -126,10 +141,39 @@ var party = payload.party default {}
             :customer_number, :party_type, :first_name, :last_name, :middle_name,
             :organization_name, :date_of_birth::date, :tax_id, :status, :customer_segment, :relationship_manager
           )
-          RETURNING *
         ]]></db:sql>
         <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
       </db:insert>
+
+      <choice doc:name="Has Identifier?">
+        <when expression="#[vars.customerNumber != null or vars.taxId != null]">
+          <db:select config-ref="Database_Config" doc:name="Select Inserted Customer by Identifier">
+            <db:sql><![CDATA[
+              SELECT *
+              FROM customers
+              WHERE (COALESCE(:customer_number, '') != '' AND customer_number = :customer_number)
+                 OR (COALESCE(:tax_id, '') != '' AND tax_id = :tax_id)
+              ORDER BY created_at DESC
+              LIMIT 1
+            ]]></db:sql>
+            <db:input-parameters><![CDATA[#[{
+              customer_number: vars.customerNumber default "",
+              tax_id: vars.taxId default ""
+            }]]]></db:input-parameters>
+          </db:select>
+        </when>
+        <otherwise>
+          <db:select config-ref="Database_Config" doc:name="Select Last Created Customer">
+            <db:sql><![CDATA[
+              SELECT *
+              FROM customers
+              ORDER BY created_at DESC
+              LIMIT 1
+            ]]></db:sql>
+            <db:input-parameters><![CDATA[#[{}]]]></db:input-parameters>
+          </db:select>
+        </otherwise>
+      </choice>
 
       <ee:transform doc:name="Transform Response">
         <ee:message>
@@ -288,18 +332,30 @@ output application/json
         <ee:set-payload><![CDATA[%dw 2.0
 output application/java
 var party = payload.party default {}
+fun normalizePartyType(pt) = 
+  if (pt == null) null
+  else if (pt as String == "Individual" or pt as String == "individual" or pt as String == "INDIVIDUAL") "Individual"
+  else if (pt as String == "Organization" or pt as String == "organization" or pt as String == "ORGANIZATION") "Organization"
+  else pt as String
+fun normalizeStatus(s) = 
+  if (s == null) null
+  else if (s as String == "Active" or s as String == "active" or s as String == "ACTIVE") "Active"
+  else if (s as String == "Inactive" or s as String == "inactive" or s as String == "INACTIVE") "Inactive"
+  else if (s as String == "Suspended" or s as String == "suspended" or s as String == "SUSPENDED") "Suspended"
+  else if (s as String == "Closed" or s as String == "closed" or s as String == "CLOSED") "Closed"
+  else s as String
 ---
 {
   customerId: vars.customerId,
   customer_number: payload.customerNumber default null,
-  party_type: party.partyType default null,
+  party_type: normalizePartyType(party.partyType),
   first_name: party.firstName default null,
   last_name: party.lastName default null,
   middle_name: party.middleName default null,
   organization_name: party.organizationName default null,
   date_of_birth: party.dateOfBirth default null,
   tax_id: party.taxId default null,
-  status: payload.status default null,
+  status: normalizeStatus(payload.status),
   customer_segment: payload.customerSegment default null,
   relationship_manager: payload.relationshipManager default null
 }]]></ee:set-payload>
@@ -324,10 +380,20 @@ var party = payload.party default {}
             relationship_manager = COALESCE(:relationship_manager, relationship_manager),
             updated_at = CURRENT_TIMESTAMP
           WHERE id = :customerId::uuid
-          RETURNING *
         ]]></db:sql>
         <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
       </db:update>
+
+      <db:select config-ref="Database_Config" doc:name="Select Updated Customer">
+        <db:sql><![CDATA[
+          SELECT *
+          FROM customers
+          WHERE id = :customerId::uuid
+        ]]></db:sql>
+        <db:input-parameters><![CDATA[#[{
+          customerId: vars.customerId
+        }]]]></db:input-parameters>
+      </db:select>
 
       <choice doc:name="Update Successful?">
         <when expression="#[sizeOf(payload) > 0]">

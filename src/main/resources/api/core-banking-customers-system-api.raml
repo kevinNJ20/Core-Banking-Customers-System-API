@@ -21,6 +21,12 @@ types:
       organizationName?: string
       dateOfBirth?: date-only
       taxId?: string
+    example:
+      partyType: "Individual"
+      firstName: "John"
+      lastName: "Doe"
+      dateOfBirth: "1990-01-15"
+      taxId: "TAX-123456"
   Customer:
     type: object
     properties:
@@ -29,6 +35,15 @@ types:
       party: Party
       customerNumber?: string
       status?: string
+    example:
+      customerNumber: "CUST-000001"
+      party:
+        partyType: "Individual"
+        firstName: "John"
+        lastName: "Doe"
+        dateOfBirth: "1990-01-15"
+        taxId: "TAX-123456"
+      status: "Active"
   ErrorResponse:
     type: object
     properties:
@@ -38,6 +53,11 @@ types:
           code: string
           message: string
           timestamp?: datetime
+    example:
+      error:
+        code: "NOT_FOUND"
+        message: "Customer not found"
+        timestamp: "2026-01-28T12:00:00Z"
 
 traits:
   hasQueryParam:
@@ -94,6 +114,15 @@ traits:
     body:
       application/json:
         type: Customer
+        example:
+          customerNumber: "CUST-000001"
+          party:
+            partyType: "Individual"
+            firstName: "John"
+            lastName: "Doe"
+            dateOfBirth: "1990-01-15"
+            taxId: "TAX-123456"
+          status: "Active"
     responses:
       201:
         body:
@@ -138,6 +167,15 @@ traits:
       body:
         application/json:
           type: Customer
+          example:
+            customerNumber: "CUST-000001"
+            party:
+              partyType: "Individual"
+              firstName: "John"
+              lastName: "Doe"
+              dateOfBirth: "1990-01-15"
+              taxId: "TAX-123456"
+            status: "Active"
       responses:
         200:
           body:
@@ -168,6 +206,11 @@ traits:
                 taxId?: string
                 email?: string
                 phone?: string
+          example:
+            criteria:
+              lastName: "Doe"
+              firstName: "John"
+              taxId: "TAX-123456"
       responses:
         200:
           body:

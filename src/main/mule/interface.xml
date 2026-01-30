@@ -118,10 +118,10 @@ output application/json
 output application/java
 ---
 {
-  customerNumber: attributes.queryParams.customerNumber default null,
-  status: attributes.queryParams.status default null,
-  lastName: attributes.queryParams.lastName default null,
-  taxId: attributes.queryParams.taxId default null,
+  customerNumber: attributes.queryParams.customerNumber default "",
+  status: attributes.queryParams.status default "",
+  lastName: attributes.queryParams.lastName default "",
+  taxId: attributes.queryParams.taxId default "",
   limit: (attributes.queryParams.limit as Number default 100) as String,
   offset: (attributes.queryParams.offset as Number default 0) as String
 }]]></ee:set-payload>
