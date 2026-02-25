@@ -11,6 +11,7 @@
   <!-- GET /customers - Business Logic Flow -->
   <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
     <try doc:name="Try">
+      <logger level="INFO" message="#['GET customers - limit: ' ++ ((payload.limit default '100') as String) ++ ', offset: ' ++ ((payload.offset default '0') as String)]" doc:name="Log request"/>
       <db:select config-ref="Database_Config" doc:name="Select Customers">
         <db:sql><![CDATA[
           SELECT *
@@ -51,9 +52,12 @@ payload map ((customer) -> {
 })]]></ee:set-payload>
         </ee:message>
       </ee:transform>
+
+      <logger level="INFO" message="#['GET customers success - count: ' ++ sizeOf(payload)]" doc:name="Log success"/>
       
       <error-handler>
         <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
+          <logger level="ERROR" message="#['GET customers failed - error: ' ++ (error.description default 'unknown')]" doc:name="Log error"/>
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -93,6 +97,7 @@ output application/json
 
   <!-- POST /customers - Business Logic Flow -->
   <flow name="create-customer-business-logic" doc:name="create-customer-business-logic">
+    <logger level="INFO" message="#['POST create customer - customerNumber: ' ++ (payload.customerNumber default 'n/a')]" doc:name="Log request"/>
     <ee:transform doc:name="Transform Request to DB Format">
       <ee:message>
         <ee:set-payload><![CDATA[%dw 2.0
