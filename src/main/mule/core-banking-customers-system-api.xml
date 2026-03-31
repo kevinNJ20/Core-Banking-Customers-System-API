@@ -146,6 +146,18 @@ fun normalizeStatus(s) =
             :customer_number, :party_type, :first_name, :last_name, :middle_name,
             :organization_name, :date_of_birth::date, :tax_id, :status, :customer_segment, :relationship_manager
           )
+          ON CONFLICT (customer_number) DO UPDATE SET
+            party_type = EXCLUDED.party_type,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            middle_name = EXCLUDED.middle_name,
+            organization_name = EXCLUDED.organization_name,
+            date_of_birth = EXCLUDED.date_of_birth,
+            tax_id = COALESCE(EXCLUDED.tax_id, customers.tax_id),
+            status = EXCLUDED.status,
+            customer_segment = EXCLUDED.customer_segment,
+            relationship_manager = EXCLUDED.relationship_manager,
+            updated_at = CURRENT_TIMESTAMP
         ]]></db:sql>
         <db:input-parameters><![CDATA[#[payload]]]></db:input-parameters>
       </db:insert>
